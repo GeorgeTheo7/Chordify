@@ -9,7 +9,7 @@ def main():
     while True:
         try:
             command = click.prompt(click.style("chord-cli@ntua",fg='bright_cyan'),type=str,prompt_suffix=': ')
-            sp.run(['./cli.py'] + command.split(' '))
+            sp.run(['python','./cli.py'] + command.split(' '))
             if command == "depart":
                 click.echo("\n\nExiting chord cli")
                 exit(0)
