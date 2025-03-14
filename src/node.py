@@ -33,17 +33,25 @@ class Node():
         return self.key == self.bnode.key
 
     def add_key(self, key, value):
-
         key_hash = hash_key(key)
-        self.data[key_hash] = (key,value)
-
+        if key_hash in self.data:
+            # If the key already exists, concatenate the new value to the old one
+            old_key, old_value = self.data[key_hash]
+            new_value = old_value + value
+            self.data[key_hash] = (key, new_value)
+        else:
+            self.data[key_hash] = (key, value)
         return key_hash
 
     def add_replica(self, key, value, replica_number):
-
         key_hash = hash_key(key)
-        self.replicas[key_hash] = (key,value, replica_number)
-
+        if key_hash in self.replicas:
+            # If the replica key exists, concatenate the new value to the existing replica value
+            old_key, old_value, _ = self.replicas[key_hash]
+            new_value = old_value + value
+            self.replicas[key_hash] = (key, new_value, replica_number)
+        else:
+            self.replicas[key_hash] = (key, value, replica_number)
         return key_hash
 
     def successor(self,key_value):
