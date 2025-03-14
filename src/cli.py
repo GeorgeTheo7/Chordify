@@ -11,6 +11,7 @@ from prettytable import PrettyTable
 CONTEXT_SETTINGS = dict(help_option_names=['--help','-h'])
 
 def chordify_server_addr():
+    # get CHORDIFYSERVER_IP and CHORDIFYSERVER_PORT from environment variables
     ip = os.environ.get("CHORDIFYSERVER_IP")
     port = os.environ.get("CHORDIFYSERVER_PORT")
 
@@ -24,18 +25,20 @@ def cli_group():
     pass
 
 @cli_group.command(context_settings=CONTEXT_SETTINGS)
-@click.option('-b','--bootstrap-node','bnode',required=False, nargs=2,type=str,metavar='<ip> <port>', help='Specify bootstrap node of chord')
+@click.option('-b','--bootstrap-node','bnode',required=False,nargs=2,type=str,metavar='<ip> <port>',help='Specify bootstrap node of chord')
 def join(bnode):
     """
         Inserts a new node.
     """
+
+    # get the Server IP and Port from environment variables.
     ip, port = chordify_server_addr()
     home_dir = str(Path.home()) + '/'
     
     url = "http://{}:{}/".format(ip, port)
     print(f"[DEBUG] bnode: {bnode}")  # Log the value of bnode
 
-    # Change the condition to check properly if bnode is provided
+    # Condition to check properly if bnode is provided
     if bnode is not None:
         print(f"[DEBUG] Using provided bootstrap node: {bnode}")
         try:
@@ -169,7 +172,7 @@ def delete(key):
 @cli_group.command(context_settings=CONTEXT_SETTINGS)
 def depart():
     """
-        Makes current node to depart.
+        Makes current node depart.
     """
     ip, port = chordify_server_addr()
 
@@ -180,7 +183,7 @@ def depart():
 @cli_group.command(context_settings=CONTEXT_SETTINGS)
 def exit():
     """
-        Makes current node to depart & exits from shell.
+        Makes current node depart & exits from shell.
     """
     ip, port = chordify_server_addr()
 
@@ -191,7 +194,7 @@ def exit():
 @cli_group.command(context_settings=CONTEXT_SETTINGS)
 def overlay():
     """
-        Displays current network topology.
+        Displays network topology.
     """
     ip, port = chordify_server_addr()
 
@@ -202,7 +205,7 @@ def overlay():
 
         data = r.json()
 
-        click.echo("Cluster Info:")
+        click.echo("Info of whole Cluster:")
         t1 = PrettyTable()
         t1.field_names = ["Hash", "Node IP", "Node Port"]
         data["nodes"].sort(key = lambda d: d["node_key"])
@@ -218,7 +221,7 @@ def overlay():
 @cli_group.command(context_settings=CONTEXT_SETTINGS)
 def info():
     """
-        Displays info for current node.
+        Displays info of current node.
     """
     ip, port = chordify_server_addr()
 
@@ -228,9 +231,9 @@ def info():
 
         data = r.json()
 
-        click.echo("Node Info:")
-        click.echo(f"* Node IP: {ip}")
-        click.echo(f"* Node Port: {port}")
+        click.echo("Info of current Node:")
+        click.echo(f"* Current Node IP: {ip}")
+        click.echo(f"* Current Node Port: {port}")
         click.echo()
 
         click.echo("Primary Keys:")
@@ -241,7 +244,7 @@ def info():
         print(t1)
 
         click.echo()
-        click.echo("Replicas Keys:")
+        click.echo("Replica Keys:")
         t2 = PrettyTable()
         t2.field_names = ["Hash", "Key", "Value", "Replica Number"]
         for k in data["replicas"]:
@@ -263,8 +266,7 @@ def info():
     else:
         click.echo(r.text)
 
-#   Dummy command, just for
-#   showing up in cli help message
+# For the help command
 @cli_group.command(context_settings=CONTEXT_SETTINGS, short_help="Prints this message and exits.")
 def help():
     """

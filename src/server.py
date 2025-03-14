@@ -11,8 +11,10 @@ import sys
 import json
 from node import *
 
+# Initialize the Flask application
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
+# Hide logs of HTTP requests
 log.disabled = True
 
 def shutdown_server():
@@ -28,19 +30,19 @@ def health_check():
 
 @app.route('/join', methods=['PUT'])
 def join():
-    global node, ip, port, kfactor,consistency
+    global node, ip, port, kappa, consistency
     bnode_ip = request.args.get("ip")
-    bnode_port = int(request.args.get("port"))
+    bnode_port = int(request.args.get("port")) # port number was given as string, so we have to cast to (int)
 
     if not node is None:
-        return "You're already part of chord.",403
+        return "You're already part of chord.", 403
 
     if ip == bnode_ip and port == bnode_port:
-        node = BootstrapNode(ip, port, kfactor, consistency)
+        node = BootstrapNode(ip, port, kappa, consistency)
         return "New chord created.", 200
     else:
         
-        node = Node(ip, port, (bnode_ip, bnode_port), kfactor, consistency)
+        node = Node(ip, port, (bnode_ip, bnode_port), kappa, consistency)
         
         # Communicate with bootstrap node
         url = "http://{}:{}/addNode".format(bnode_ip,bnode_port)
@@ -49,8 +51,8 @@ def join():
         if r.status_code == 200:
 
             data = r.json()
-            node.previous_node = ReferenceNode(data["previous"]["ip"],int(data["previous"]["port"]))
-            node.next_node = ReferenceNode(data["next"]["ip"],int(data["next"]["port"]))
+            node.previous_node = RefNode(data["previous"]["ip"],int(data["previous"]["port"]))
+            node.next_node = RefNode(data["next"]["ip"],int(data["next"]["port"]))
             
             # Inform neighboors
             # Receive keys from next
@@ -61,9 +63,9 @@ def join():
             data = r1.json()
             node.data = {d["key_hash"]:(d["key"],d["value"]) for d in data["keys"]}
 
-            if node.kfactor > 1:
+            if node.kappa > 1:
 
-                if node.consistency_type == "chain-replication" or node.consistency_type == "eventually":
+                if node.consistency_type == "chain-replication" or node.consistency_type == "eventual-consistency":
                     
                     node.replicas = {d["key_hash"]:(d["key"],d["value"],d["replica_number"]) for d in data["replicas"]}
                     # Initiate fix replicas operation
@@ -80,13 +82,13 @@ def join():
             url = "http://{}:{}/changePrevious".format(node.next_node.ip,node.next_node.port)
             r3 = requests.put(url, params={"ip":node.ip,"port":node.port})
 
-            if node.kfactor == 1:
+            if node.kappa == 1:
                 # Tell next to delete unnecessary keys
                 url = "http://{}:{}/deleteKeys".format(node.next_node.ip,node.next_node.port)
                 r4 = requests.delete(url, params={"keynode":node.key})
 
             # Edge case:
-            elif node.kfactor > 1:
+            elif node.kappa > 1:
                 
                 data = {"existing":list(node.replicas.keys()) + list(node.data.keys())}
                 url = "http://{}:{}/generateReplicas".format(node.previous_node.ip,node.previous_node.port)
@@ -109,7 +111,7 @@ def change_next():
     if new_ip == node.ip and node.port == new_port:
         node.next_node = None
     else:
-        node.next_node = ReferenceNode(new_ip,new_port)
+        node.next_node = RefNode(new_ip,new_port)
     return "Changed next node.", 200
 
 @app.route('/changePrevious',methods=['PUT'])
@@ -119,7 +121,7 @@ def change_previous():
     if new_ip == node.ip and node.port == new_port:
         node.previous_node = None
     else:
-        node.previous_node = ReferenceNode(new_ip,new_port)
+        node.previous_node = RefNode(new_ip,new_port)
     return "Changed previous node.", 200
 
 @app.route('/addNode', methods=['PUT'])
@@ -160,9 +162,9 @@ def depart():
             r = requests.post("http://{}:{}/send".format(node.next_node.ip,node.next_node.port), json=json.dumps(data))
 
             # In case of replication, my replicas sould shift
-            if node.kfactor > 1:
+            if node.kappa > 1:
                 
-                if node.consistency_type == "chain-replication" or node.consistency_type == "eventually":
+                if node.consistency_type == "chain-replication" or node.consistency_type == "eventual-consistency":
                     
                     s = requests.Session()
                     s.mount('http://', HTTPAdapter(max_retries=0))
@@ -171,7 +173,7 @@ def depart():
         # Send replicas
         if not node.replicas == {}:
 
-            if node.consistency_type == "chain-replication" or node.consistency_type == "eventually":            
+            if node.consistency_type == "chain-replication" or node.consistency_type == "eventual-consistency":            
                 
                 s = requests.Session()
                 s.mount('http://', HTTPAdapter(max_retries=0))
@@ -289,7 +291,7 @@ def query():
                                 mimetype='application/json'
                             )
                 
-                if node.kfactor == 1:
+                if node.kappa == 1:
 
                     return my_response
 
@@ -309,7 +311,7 @@ def query():
                     else:
                         return r.text, r.status_code
                 
-                elif node.consistency_type == "eventually":
+                elif node.consistency_type == "eventual-consistency":
                     
                     return  my_response  
             else:
@@ -319,7 +321,7 @@ def query():
             s = requests.Session()
             s.mount('http://', HTTPAdapter(max_retries=0))
 
-            if node.kfactor > 1 and key in node.replicas:
+            if node.kappa > 1 and key in node.replicas:
 
                 data = {
                     "hash": key,
@@ -336,13 +338,13 @@ def query():
                                 mimetype='application/json'
                             )
                 
-                if node.consistency_type == "eventually":
+                if node.consistency_type == "eventual-consistency":
                     
                     return my_response
 
                 elif node.consistency_type == "chain-replication":
                     
-                    if node.replicas[key][2] == node.kfactor - 1 or node.next_node.key == successor.key: 
+                    if node.replicas[key][2] == node.kappa - 1 or node.next_node.key == successor.key: 
 
                         return my_response
 
@@ -394,7 +396,7 @@ def query_replicas():
                                 mimetype='application/json'
                             )
     
-        if replica_number == node.kfactor - 1:
+        if replica_number == node.kappa - 1:
             return my_response
         else:
                 
@@ -464,7 +466,7 @@ def query_all():
 
             # Update next node
             data = r1.json()
-            next_node = ReferenceNode(data["ip"],data["port"])        
+            next_node = RefNode(data["ip"],data["port"])        
 
     response = app.response_class(
         response=json.dumps(data_list),
@@ -502,7 +504,7 @@ def insert():
                 mimetype='application/json'
             )
 
-        if node.kfactor > 1:
+        if node.kappa > 1:
 
             url = "http://{}:{}/insertReplicas".format(node.next_node.ip,node.next_node.port)
             params = {"key":key_value,"value":value,"replica_number":1}
@@ -513,7 +515,7 @@ def insert():
                 s.mount('http://', HTTPAdapter(max_retries=0))
                 r = s.post(url,params=params)
             
-            elif node.consistency_type == "eventually":
+            elif node.consistency_type == "eventual-consistency":
                 
                 # Asychrnous call of insertReplicas
                 p1 = multiprocessing.Process(target=async_post, args=(url,params,{}))
@@ -548,13 +550,13 @@ def insert_replicas():
     replica_number = int(request.args.get("replica_number"))
     
     # Check if already have this key in data
-    # Only edge case if kfactor >= number on nodes
+    # Only edge case if kappa >= number on nodes
     if not node.key == node.successor(key_value).key:
 
         # Update replica key
         node.add_replica(key_value, value, replica_number)
 
-        if replica_number < node.kfactor - 1:
+        if replica_number < node.kappa - 1:
             s = requests.Session()
             s.mount('http://', HTTPAdapter(max_retries=0))
             url = "http://{}:{}/insertReplicas".format(node.next_node.ip,node.next_node.port)
@@ -574,14 +576,14 @@ def fix_replicas():
     json_data = request.get_json()
     keys_of_initial_node = set(json.loads(json_data)["keys"])
     
-    # Only edge case if kfactor >= number on nodes
+    # Only edge case if kappa >= number on nodes
     if not node.key == initial_node:
 
         # Fix your replicas
         deletion_replicas = set()
         for (k,(key, value, replica_number)) in node.replicas.items():
             if replica_number > hop or (replica_number == hop and not k in keys_of_initial_node):
-                if replica_number < node.kfactor - 1:
+                if replica_number < node.kappa - 1:
                     node.add_replica(key,value,replica_number + 1)
                 else:
                     deletion_replicas.add(k)
@@ -589,7 +591,7 @@ def fix_replicas():
         for k in deletion_replicas:
             del node.replicas[k]
 
-        if hop < node.kfactor - 1:
+        if hop < node.kappa - 1:
             s = requests.Session()
             s.mount('http://', HTTPAdapter(max_retries=0))
             url = "http://{}:{}/fixReplicas".format(node.next_node.ip,node.next_node.port)
@@ -631,7 +633,7 @@ def generate_replicas():
             data[k] = (key,value,1)
     # Check replicas
     for (k,(key,value,replica_number)) in node.replicas.items():
-        if replica_number < node.kfactor - 1 and k not in existing:
+        if replica_number < node.kappa - 1 and k not in existing:
             data[k] = (key,value,replica_number + 1)
     
     data = {"keys":[{"key":v[0],"value":v[1],"replica_number":v[2]} for (k,v) in data.items()]}
@@ -655,12 +657,12 @@ def transfer_keys():
     global node        
     keynode = int(request.args.get("keynode"))
 
-    if node.kfactor == 1:
+    if node.kappa == 1:
         
         data_list = [{"key_hash":k,"key":v[0],"value":v[1]} for (k,v) in node.data.items() if k <= keynode or k > node.key]
         data = {"keys":data_list}
         
-    elif node.consistency_type == "chain-replication" or node.consistency_type == "eventually":
+    elif node.consistency_type == "chain-replication" or node.consistency_type == "eventual-consistency":
         
         primary_keys = {k:v for (k,v) in node.data.items() if k <= keynode or k > node.key}
         replicas_keys = [{"key_hash":k,"key":v[0],"value":v[1],"replica_number":v[2]} for (k,v) in node.replicas.items()]
@@ -670,7 +672,7 @@ def transfer_keys():
         deletion_replicas = set()
         
         for (k,(key,value,replica_number)) in node.replicas.items():
-            if replica_number < node.kfactor - 1:
+            if replica_number < node.kappa - 1:
                 node.add_replica(key, value, replica_number + 1)
             else:
                 deletion_replicas.add(k)
@@ -738,7 +740,7 @@ def delete():
         
             del node.data[key]
 
-            if node.kfactor == 1:
+            if node.kappa == 1:
                 return delete_response
             else:
 
@@ -756,7 +758,7 @@ def delete():
                     else:
                         return r.text, r.status_code
 
-                elif node.consistency_type == "eventually":
+                elif node.consistency_type == "eventual-consistency":
                     async_delete(url,params,{})
                     return delete_response
         else:
@@ -784,13 +786,13 @@ def delete_replicas():
     replica_number = int(request.args.get("replica_number"))
     
 
-    # Edge case for kfactor >= number of nodes
+    # Edge case for kappa >= number of nodes
     if not node.key == node.successor(key_value).key:
         
         # Delete replica key
         del node.replicas[hash_key(key_value)]
 
-        if replica_number < node.kfactor - 1:
+        if replica_number < node.kappa - 1:
                 
             s = requests.Session()
             s.mount('http://', HTTPAdapter(max_retries=0))
@@ -913,7 +915,7 @@ if __name__ == "__main__":
 
     ip = socket.gethostbyname(socket.gethostname())
     port = int(sys.argv[1])
-    kfactor = int(sys.argv[2])
+    kappa = int(sys.argv[2])
     consistency = sys.argv[3]
     node = None
 

@@ -3,13 +3,13 @@
 import hashlib
 
 def modulo(x, y):
-    # when y is power of 2
+    # when y is a power of 2
     return x & (y - 1)
 
 def hash_key(s):
     return modulo(int(hashlib.sha1(str.encode(s)).hexdigest(),16), 1 << 160)
 
-class ReferenceNode():
+class RefNode():
     def __init__(self,ip,port):
         self.ip = ip
         self.port = port
@@ -21,12 +21,12 @@ class Node():
     next_node = None
     previous_node = None
 
-    def __init__(self, ip, port, bnode, kfactor = 1, consistency_type = "eventually"):
+    def __init__(self, ip, port, bnode, kappa = 1, consistency_type = "eventual-consistency"):
         self.ip = ip
         self.port = port
         self.key = hash_key("{}:{}".format(ip, port))
-        self.bnode = ReferenceNode(bnode[0],bnode[1])
-        self.kfactor = kfactor
+        self.bnode = RefNode(bnode[0],bnode[1])
+        self.kappa = kappa
         self.consistency_type = consistency_type
 
     def is_bootstrap(self):
@@ -59,14 +59,14 @@ class Node():
         key = hash_key(key_value)
 
         if self.next_node == None or self.previous_node == None:
-            return ReferenceNode(self.ip, self.port)
+            return RefNode(self.ip, self.port)
 
         if self.previous_node.key < self.next_node.key:
             # Inner node
             if key <= self.previous_node.key:
                 return self.previous_node
             elif key <= self.key:
-                return ReferenceNode(self.ip, self.port)
+                return RefNode(self.ip, self.port)
             else:
                 return self.next_node
         else:
@@ -78,11 +78,11 @@ class Node():
                 elif key <= self.previous_node.key:
                     return self.previous_node
                 else:
-                    return ReferenceNode(self.ip, self.port)
+                    return RefNode(self.ip, self.port)
             else:
                 # Lowest Edge node
                 if key <= self.key or key > self.previous_node.key:
-                    return ReferenceNode(self.ip, self.port)
+                    return RefNode(self.ip, self.port)
                 else:
                     return self.next_node
 
@@ -91,8 +91,8 @@ class BootstrapNode(Node):
     nodes = {}
     number_of_nodes = 0
 
-    def __init__(self, ip, port, kfactor = 1, consistency_type = "chain-replication"):
-        super().__init__(ip, port, (ip,port), kfactor, consistency_type)
+    def __init__(self, ip, port, kappa = 1, consistency_type = "chain-replication"):
+        super().__init__(ip, port, (ip,port), kappa, consistency_type)
         self.nodes[self.key] = (ip, port)
         self.number_of_nodes += 1
         

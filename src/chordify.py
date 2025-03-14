@@ -30,9 +30,7 @@ class ChordifyShell(cmd.Cmd):
         try:
             args = shlex.split(line)
         except ValueError:
-            click.echo("Please ensure that keys are formated properly...")
-            click.echo("* If your key contains quotation marks, enclose it with single quotation marks.")
-            click.echo("* If your key contains apostrophes, enclose it with double quotation marks.")
+            click.echo("Ensure that your keys are formated in a correct way.")
             return cmd.Cmd.default(self, line)
 
         subcommand = cli.cli_group.commands.get(args[0])
@@ -53,9 +51,9 @@ class ChordifyShell(cmd.Cmd):
             except click.FileError as file_error:
                 file_error.show()
             except click.Abort:
-                click.echo("Command ended unexpectedly")
+                click.echo("Abort. Command ended unexpectedly")
             except NotImplementedError:
-                click.echo("Not Implemented Yet")
+                click.echo("Not Implemented Error")
 
         else:
             return cmd.Cmd.default(self, line)
@@ -67,29 +65,28 @@ def port_in_use(ip, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((ip, port)) == 0
 
-def start_server(kfactor, consistency_type):
+def start_server(kappa, consistency_type):
     ip = socket.gethostbyname(socket.gethostname())
     # Find available port
     port = None
-    for p in range(5000,5100):
+    for p in range(5000,5150):
         if port_in_use(ip, p) == 0:
             port = p
             break
 
     if port == None:
         click.echo("Couldn't find available port for chordify server.")
-        click.echo("Please try again later. Exit program with ctrl + C")
+        click.echo("Please try again later. Exit with ctrl + C")
         return False
 
-    # Set enviromentals for cli commands
+    # Set environment variables for cli commands
     os.environ['CHORDIFYSERVER_IP'] = ip
     os.environ['CHORDIFYSERVER_PORT'] = str(port)
 
     pid = os.fork()
     if pid == 0:
-        os.execle("./server.py","server.py",str(port),str(kfactor),consistency_type,os.environ)
-        # Unreachable statement. 
-        # Executed only if exec fails
+        os.execle("./server.py","server.py",str(port),str(kappa),consistency_type,os.environ)
+        # The following should never get executed:
         click.echo("Couldn't start chordify server")     
     else:
         url = "http://{}:{}/".format(ip,port)
@@ -103,42 +100,43 @@ def start_server(kfactor, consistency_type):
     
     return True
 
-def check_chordify_parameters():
+def check_and_return_chordify_parameters():
 
     if len(sys.argv) < 2:
         return 1,""
 
     try:
-        kfactor = int(sys.argv[1])
+        kappa = int(sys.argv[1])
     except ValueError:
-        click.echo("k factor must be a positive integer!")
+        click.echo("replication factor must be a positive integer!")
         exit()
 
-    if kfactor <= 0:
-        click.echo("k factor must be a positive integer!")
+    if kappa <= 0:
+        click.echo("replication factor must be a positive integer!")
         exit()
-    elif kfactor == 1:
-        return kfactor,""
+    elif kappa == 1:
+        return kappa,""
     elif len(sys.argv) < 3:
         click.echo("Please, provide a consistency policy:")
-        click.echo("(*) chain-replication (*) eventually")
+        click.echo("EITHER chain-replication OR eventual-consistency")
         exit()
     else:
         consistency_type = sys.argv[2]
-        if not consistency_type in {"chain-replication","eventually"}:
+        if not consistency_type in {"chain-replication","eventual-consistency"}:
             click.echo("Not supported policy!")
+            click.echo("Choose EITHER chain-replication OR eventual-consistency")
             exit()
-        return kfactor,consistency_type
+        return kappa,consistency_type
 
 def main():
 
-    kfactor, consistency_type = check_chordify_parameters()
+    kappa, consistency_type = check_and_return_chordify_parameters()
 
-    f = Figlet(font='slant')
+    f = Figlet(font='3-d')
     click.echo(f.renderText('CHORDIFY'))
     click.echo("Welcome to Our Chord Implementation!!\n")
 
-    if not start_server(kfactor, consistency_type):
+    if not start_server(kappa, consistency_type):
         exit() 
     chordifyshell = ChordifyShell()
     try:
