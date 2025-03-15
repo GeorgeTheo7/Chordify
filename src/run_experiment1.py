@@ -10,10 +10,11 @@ It performs the following steps:
   3. Waits for the chord network to stabilize.
   4. Reads its corresponding insert file (../insert/insert_XX_part.txt, with XX matching the node id)
      and issues "insert <key> <key>" commands.
-  5. Records the time of the first and the last insertion command.
-  6. Computes the duration between the 50th insertion and the 1st insertion.
-  7. Prints a standardized insertion duration line ("INSERTION_DURATION: <value>") for parsing by the connector.
-  8. Terminates the chordify node process.
+  5. For each insert, waits until a response indicating a successful insertion is received before issuing the next.
+  6. Records the time of the first and the last insertion command.
+  7. Computes the duration between the 50th insertion and the 1st insertion.
+  8. Prints a standardized insertion duration line ("INSERTION_DURATION: <value>") for parsing by the connector.
+  9. Terminates the chordify node process.
 """
 
 import subprocess
@@ -65,10 +66,15 @@ def run_inserts(proc, insert_file):
                 key = line.strip()
                 if not key:
                     continue
+                # Record the start time at the first insertion.
                 if first_insertion_time is None:
                     first_insertion_time = time.time()
+                # Build and send the insert command.
                 cmd = f"insert {key} {key}\n"
                 send_command(proc, cmd)
+                # Wait for the response that confirms the insert happened.
+                response_line = proc.stdout.readline().strip()
+                print(f"[Insert response] {response_line}")
                 total_keys += 1
                 last_insertion_time = time.time()
     except FileNotFoundError:

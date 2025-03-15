@@ -19,8 +19,7 @@ vm_hosts = [
     "team_32-vm2",
     "team_32-vm3",
     "team_32-vm4",
-    "team_32-vm5",
-    "team_32-vm6"
+    "team_32-vm5"
 ]
 
 # Experiment configurations.
