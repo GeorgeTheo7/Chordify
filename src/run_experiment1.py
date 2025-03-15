@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-run_experiment1.py
-
-This script is executed on a VM to run the experiment for a single chord node.
-It performs the following steps:
-  1. Starts the chordify node (by running chordify.py as a subprocess).
-  2. For the bootstrap node (if run with --bootstrap) waits until the node prints its server info,
-     then sends "join -b {ip} {port}". For other nodes, it sends "join" after a short delay.
-  3. Waits for the chord network to stabilize.
-  4. Reads its corresponding insert file (../insert/insert_XX_part.txt, with XX matching the node id)
-     and issues "insert <key> <key>" commands.
-  5. For each insert, waits until a response indicating a successful insertion is received before issuing the next.
-  6. Records the time of the first and the last insertion command.
-  7. Computes the duration between the 50th insertion and the 1st insertion.
-  8. Prints a standardized insertion duration line ("INSERTION_DURATION: <value>") for parsing by the connector.
-  9. Terminates the chordify node process.
-"""
-
 import subprocess
 import time
 import re
@@ -56,35 +37,42 @@ def send_command(proc, command):
         proc.stdin.write(command)
         proc.stdin.flush()
 
-def run_inserts(proc, insert_file):
+def run_inserts(proc, insert_file, timeout=30):
     first_insertion_time = None
     last_insertion_time = None
     total_keys = 0
     try:
         with open(insert_file, 'r') as f:
             for line in f:
-                key = line.strip()  # Use the entire line as the key
+                key = line.strip()
                 if not key:
                     continue
                 # Record the start time at the first insertion.
                 if first_insertion_time is None:
                     first_insertion_time = time.time()
                 # Build and send the insert command.
-                cmd = f"insert '{key}' '{key}'\n"  # Ensure the full key is passed
+                cmd = f"insert '{key}' '{key}'\n"
                 send_command(proc, cmd)
-                # Wait for the response that confirms the insert happened.
-                response_line = proc.stdout.readline().strip()
-                print(f"[Insert response] {response_line}")
-                total_keys += 1
-                last_insertion_time = time.time()
+                # Wait for the success message or error
+                success = False
+                start_wait = time.time()
+                while not success and (time.time() - start_wait < timeout):
+                    response_line = proc.stdout.readline().strip()
+                    if response_line:
+                        print(f"[Insert response] {response_line}")
+                        if "Key inserted successfully." in response_line:
+                            success = True
+                            last_insertion_time = time.time()
+                            total_keys += 1
+                        elif "Error" in response_line:
+                            print(f"Insert failed for key {key}")
+                            break
+                if not success:
+                    print(f"Timeout waiting for insert confirmation for key {key}")
+                    break
     except FileNotFoundError:
         print(f"Insert file {insert_file} not found!")
-    if first_insertion_time is None or last_insertion_time is None:
-        duration = 0
-    else:
-        duration = last_insertion_time - first_insertion_time
-    return total_keys, duration
-
+    return total_keys, first_insertion_time, last_insertion_time
 
 def terminate_process(proc):
     try:
@@ -127,9 +115,16 @@ def main():
     time.sleep(3)  # Allow time for the chord ring to stabilize.
 
     insert_file = os.path.join("..", "insert", f"insert_{args.node_id:02d}_part.txt")
-    total_keys, duration = run_inserts(proc, insert_file)
-    print(f"Node {args.node_id}: Inserted {total_keys} keys in {duration:.5f} seconds.")
-    print(f"INSERTION_DURATION: {duration:.5f}")
+    total_keys, first_time, last_time = run_inserts(proc, insert_file)
+    
+    if first_time is not None and last_time is not None:
+        duration = last_time - first_time
+        print(f"Node {args.node_id}: Inserted {total_keys} keys in {duration:.5f} seconds.")
+        print(f"INSERTION_DURATION: {duration:.5f}")
+        print(f"INSERTION_START: {first_time:.5f}")
+        print(f"INSERTION_END: {last_time:.5f}")
+    else:
+        print("No keys were inserted.")
 
     terminate_process(proc)
 
