@@ -4,9 +4,9 @@ connect_experiment1.py
 
 This script, running on your MacBook, connects to the 6 VMs (team_32-vm1 through team_32-vm6)
 in a round-robin fashion to start 10 chord nodes. Each node runs run_experiment1.py remotely.
-Each node prints its throughput in the standardized format "THROUGHPUT: <value>".
-After all nodes finish, this script aggregates the throughput (summing over all 10 nodes)
-and prints a summary for each experiment configuration.
+Each node prints its insertion duration (for 50 insertions) in the standardized format "INSERTION_DURATION: <value>".
+After all nodes finish, this script aggregates the durations by taking the maximum (i.e., the slowest 50 insertions)
+and then computes throughput as (500 keys / max_duration) for each experiment configuration.
 """
 
 import subprocess
@@ -30,7 +30,6 @@ consistency_options = ["chain-replication", "eventual-consistency"]
 def get_vm_ip(vm):
     """Retrieve the IP address of a given VM via SSH."""
     try:
-        # This command gets the first IP address returned by 'hostname -I'
         cmd = f"ssh {vm} hostname -I | awk '{{print $1}}'"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout.strip() or "Unknown"
@@ -39,17 +38,16 @@ def get_vm_ip(vm):
 
 def run_experiment(k, consistency):
     processes = []
-    throughput_sum = 0.0
+    durations = []
     vm_info = {vm: get_vm_ip(vm) for vm in vm_hosts}
     print(f"\n=== Starting experiment with k={k} and consistency={consistency} ===")
     
-    # Launch 10 nodes (node IDs 0 to 9) in round-robin over the available VMs.
+    # Launch 10 nodes concurrently in round-robin over the available VMs.
     for node_id in range(10):
         vm = vm_hosts[node_id % len(vm_hosts)]
         vm_ip = vm_info.get(vm, "Unknown")
         
         # Build the remote command.
-        # It changes directory into Chordify/src and runs run_experiment1.py with appropriate arguments.
         cmd = f"cd Chordify/src && python3 run_experiment1.py --node_id {node_id} --k {k} --consistency {consistency}"
         if node_id == 0:
             cmd += " --bootstrap"
@@ -57,7 +55,7 @@ def run_experiment(k, consistency):
         print(f"\n--- Starting node {node_id} on {vm} ({vm_ip}) ---")
         proc = subprocess.Popen(full_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         processes.append((node_id, vm, vm_ip, proc))
-        time.sleep(0.5)  # slight delay between launching nodes
+        # (Removed delay so nodes start concurrently.)
     
     # Wait for all nodes to finish and collect outputs.
     for node_id, vm, vm_ip, proc in processes:
@@ -65,19 +63,26 @@ def run_experiment(k, consistency):
         print(f"\n--- Output from node {node_id} on {vm} ({vm_ip}) ---\n{stdout}")
         if stderr:
             print(f"--- Error output from node {node_id} on {vm} ---\n{stderr}")
-        # Look for a line that begins with "THROUGHPUT:" to parse the throughput value.
-        match = re.search(r"THROUGHPUT:\s*([0-9.]+)", stdout)
+        # Look for the standardized insertion duration line.
+        match = re.search(r"INSERTION_DURATION:\s*([0-9.]+)", stdout)
         if match:
             try:
-                node_tp = float(match.group(1))
-                throughput_sum += node_tp
+                node_duration = float(match.group(1))
+                durations.append(node_duration)
             except ValueError:
-                print(f"Could not parse throughput from node {node_id}")
+                print(f"Could not parse insertion duration from node {node_id}")
         else:
-            print(f"Throughput value not found in node {node_id}'s output.")
+            print(f"Insertion duration not found in node {node_id}'s output.")
     
-    print(f"\n>>> Experiment result: Replication factor k={k}, consistency={consistency}: {throughput_sum:.1f} key/sec")
-    return (k, consistency, throughput_sum)
+    if durations:
+        max_duration = max(durations)
+        overall_throughput = 500 / max_duration if max_duration > 0 else float('inf')
+    else:
+        max_duration = 0
+        overall_throughput = 0
+    
+    print(f"\n>>> Experiment result: Replication factor k={k}, consistency={consistency}: {overall_throughput:.1f} key/sec (Max insertion duration: {max_duration:.5f} sec)")
+    return (k, consistency, overall_throughput)
 
 def main():
     results = []
