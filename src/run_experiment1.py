@@ -37,41 +37,61 @@ def send_command(proc, command):
         proc.stdin.write(command)
         proc.stdin.flush()
 
-def run_inserts(proc, insert_file, timeout=30):
+def run_inserts(proc, insert_file, max_retries=3, timeout=30):
     first_insertion_time = None
     last_insertion_time = None
     total_keys = 0
-    try:
-        with open(insert_file, 'r') as f:
-            for line in f:
-                key = line.strip()
-                if not key:
-                    continue
-                # Record the start time at the first insertion.
+    
+    with open(insert_file, 'r') as f:
+        for line in f:
+            key = line.strip()
+            if not key:
+                continue
+
+            retries = 0
+            success = False
+            
+            while not success and retries < max_retries:
                 if first_insertion_time is None:
                     first_insertion_time = time.time()
-                # Build and send the insert command.
-                cmd = f"insert '{key}' '{key}'\n"
-                send_command(proc, cmd)
-                # Wait for the success message or error
-                success = False
-                start_wait = time.time()
-                while not success and (time.time() - start_wait < timeout):
-                    response_line = proc.stdout.readline().strip()
-                    if response_line:
+
+                try:
+                    # Send insert command
+                    cmd = f"insert '{key}' '{key}'\n"
+                    send_command(proc, cmd)
+
+                    # Read responses until we get confirmation
+                    start_wait = time.time()
+                    while time.time() - start_wait < timeout:
+                        response_line = proc.stdout.readline().strip()
+                        if not response_line:
+                            continue
+
                         print(f"[Insert response] {response_line}")
+
                         if "Key inserted successfully." in response_line:
                             success = True
                             last_insertion_time = time.time()
                             total_keys += 1
-                        elif "Error" in response_line:
-                            print(f"Insert failed for key {key}")
                             break
-                if not success:
-                    print(f"Timeout waiting for insert confirmation for key {key}")
+                            
+                        elif "error" in response_line.lower():
+                            print(f"Insert failed for key {key}: {response_line}")
+                            break
+
+                    if not success:
+                        print(f"Retrying insert for key {key} (attempt {retries+1}/{max_retries})")
+                        retries += 1
+                        time.sleep(1)
+
+                except Exception as e:
+                    print(f"Error during insert: {str(e)}")
                     break
-    except FileNotFoundError:
-        print(f"Insert file {insert_file} not found!")
+
+            if not success:
+                print(f"Permanent failure inserting key {key}")
+                break
+
     return total_keys, first_insertion_time, last_insertion_time
 
 def terminate_process(proc):
