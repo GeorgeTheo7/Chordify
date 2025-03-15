@@ -276,5 +276,32 @@ def help():
         click.echo(cli_group.get_help(ctx))
     return 0
 
+@cli_group.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('filename', metavar='<filename>')
+def insertfile(filename):
+    """Inserts all keys from a file (song titles as keys)."""
+    ip, port = chordify_server_addr()
+    total_time = 0
+    count = 0
+    
+    with open(f"insert/{filename}", 'r') as f:  # Path to insert folder
+        for line in f:
+            key = line.strip()
+            start_time = time.time()
+            try:
+                # Use song title as both key and value
+                r = requests.post(
+                    f"http://{ip}:{port}/insert",
+                    params={"key": key, "value": key}
+                )
+                if r.status_code == 200:
+                    count += 1
+            except Exception as e:
+                click.echo(f"Error inserting {key}: {str(e)}")
+            total_time += time.time() - start_time
+    
+    click.echo(f"Inserted {count} keys in {total_time:.2f}s")
+    return total_time
+
 if __name__ == "__main__":
     cli_group()

@@ -133,7 +133,7 @@ def main():
     kappa, consistency_type = check_and_return_chordify_parameters()
 
     f = Figlet(font='slant')
-    click.echo(f.renderText('CHORDIFY'))
+    click.echo(f.renderText('CHORDIFLYYY'))
     click.echo("Welcome to Our Chord Implementation!!\n")
 
     if not start_server(kappa, consistency_type):

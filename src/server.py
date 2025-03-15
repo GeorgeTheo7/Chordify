@@ -920,7 +920,7 @@ if __name__ == "__main__":
     node = None
 
     try:
-        app.run(host=ip, port=port)
+        app.run(host=ip, port=port, threaded=True)
     except socket.error:
         print("Port {} is not available".format(sys.argv[1]))
         exit()
