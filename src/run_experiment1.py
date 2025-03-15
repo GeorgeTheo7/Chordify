@@ -5,14 +5,14 @@ run_experiment1.py
 This script is executed on a VM to run the experiment for a single chord node.
 It performs the following steps:
   1. Starts the chordify node (by running chordify.py as a subprocess).
-  2. If run with the --bootstrap flag (i.e. for node 0), waits until the node prints its server info,
-     then sends "join -b {ip} {port}".
-     Otherwise, it simply sends "join" after a brief pause.
+  2. For the bootstrap node (if run with --bootstrap) waits until the node prints its server info,
+     then sends "join -b {ip} {port}". For other nodes, it sends "join" after a short delay.
   3. Waits for the chord network to stabilize.
   4. Reads its corresponding insert file (../insert/insert_XX_part.txt, with XX matching the node id)
-     and sends "insert <key> <key>" commands.
+     and issues "insert <key> <key>" commands.
   5. Measures and prints the throughput (keys per second) for the insert operations.
-  6. Terminates the chordify node process.
+  6. Prints a standardized throughput line ("THROUGHPUT: <value>") for parsing by the connector.
+  7. Terminates the chordify node process.
 """
 
 import subprocess
@@ -23,7 +23,6 @@ import signal
 import argparse
 
 def start_chord_node(k, consistency):
-    # Start chordify.py with the provided replication factor and consistency.
     cmd = ["python3", "chordify.py", str(k), consistency]
     proc = subprocess.Popen(
         cmd,
@@ -93,11 +92,11 @@ def main():
     # Start chordify node.
     proc = start_chord_node(args.k, args.consistency)
 
-    # For the bootstrap node, wait for its server info and then send join command with -b.
     if args.bootstrap:
+        # Wait until the bootstrap node prints its server info and then send join with -b.
         line = read_until(proc, "Server is up and running in")
         if line:
-            m = re.search(r"Server is up and running in ([\d\.]+):(\d+)", line)
+            m = re.search(r"Server is up and running in ([\\d\\.]+):(\\d+)", line)
             if m:
                 bootstrap_ip = m.group(1)
                 bootstrap_port = m.group(2)
@@ -124,8 +123,10 @@ def main():
     else:
         throughput = float('inf')
     print(f"Node {args.node_id}: Inserted {total_keys} keys in {duration:.5f} seconds. Throughput: {throughput:.1f} keys/sec")
-
-    # Terminate the chordify process.
+    
+    # Print standardized throughput line for aggregation.
+    print(f"THROUGHPUT: {throughput:.1f}")
+    
     terminate_process(proc)
 
 if __name__ == "__main__":
