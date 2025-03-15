@@ -63,14 +63,14 @@ def run_inserts(proc, insert_file):
     try:
         with open(insert_file, 'r') as f:
             for line in f:
-                key = line.strip()
+                key = line.strip()  # Use the entire line as the key
                 if not key:
                     continue
                 # Record the start time at the first insertion.
                 if first_insertion_time is None:
                     first_insertion_time = time.time()
                 # Build and send the insert command.
-                cmd = f"insert {key} {key}\n"
+                cmd = f"insert '{key}' '{key}'\n"  # Ensure the full key is passed
                 send_command(proc, cmd)
                 # Wait for the response that confirms the insert happened.
                 response_line = proc.stdout.readline().strip()
@@ -84,6 +84,7 @@ def run_inserts(proc, insert_file):
     else:
         duration = last_insertion_time - first_insertion_time
     return total_keys, duration
+
 
 def terminate_process(proc):
     try:
