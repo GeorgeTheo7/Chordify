@@ -52,6 +52,8 @@ def run_experiment(k, consistency):
             cmd += " --bootstrap"
         full_cmd = ["ssh", vm, cmd]
         print(f"\n--- Starting node {node_id} on {vm} ({vm_ip}) ---")
+        
+        # Uses subprocess.Popen to run run_experiment1.py on the remote VM via SSH
         proc = subprocess.Popen(full_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         processes.append((node_id, vm, vm_ip, proc))
         # (Removed delay so nodes start concurrently.)
@@ -62,6 +64,7 @@ def run_experiment(k, consistency):
         print(f"\n--- Output from node {node_id} on {vm} ({vm_ip}) ---\n{stdout}")
         if stderr:
             print(f"--- Error output from node {node_id} on {vm} ---\n{stderr}")
+        
         # Look for the standardized insertion duration line.
         match = re.search(r"INSERTION_DURATION:\s*([0-9.]+)", stdout)
         if match:
