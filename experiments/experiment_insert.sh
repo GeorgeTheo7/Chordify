@@ -7,7 +7,7 @@ keys="../insert/insert_00_part.txt"
 # Operations
 conda_path=$(which conda)
 path=${conda_path%/*}
-# Operations to be sent
+# Operations to be send
 find_ip='IPs=$(hostname -I) && arrIP=(${IPs// / })'
 set_ip='export CHORDIFYSERVER_IP=${arrIP[0]}'
 insert="$path/python ./src/cli.py insert"
@@ -35,9 +35,9 @@ do
 	
 	if [ "$node" = "main-node" ]
 	then
-		ssh user@$node "$find_ip_main && $set_ip_main && $set_port && $insert_main \"$key\" $value"
+		ssh ubuntu@$node "$find_ip_main && $set_ip_main && $set_port && $insert_main \"$key\" $value"
 	else
-		ssh user@$node "$find_ip && $set_ip && $set_port && $insert \"$key\" $value"
+		ssh ubuntu@$node "$find_ip && $set_ip && $set_port && $insert \"$key\" $value"
 	fi
 
 done 4<$nodes 5<$keys

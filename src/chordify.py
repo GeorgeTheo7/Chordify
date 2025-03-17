@@ -69,7 +69,7 @@ def start_server(kappa, consistency_type):
     ip = socket.gethostbyname(socket.gethostname())
     # Find available port
     port = None
-    for p in range(5000,5150):
+    for p in range(5050,5061):
         if port_in_use(ip, p) == 0:
             port = p
             break

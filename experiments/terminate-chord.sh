@@ -18,7 +18,7 @@ terminate() {
     for n in 1 2
         do
             set_port="export CHORDIFYSERVER_PORT=500$((n - 1))"
-            ssh user@main-node "$find_ip_main && $set_ip_main && $set_port && $exit_main"
+            ssh ubuntu@main-node "$find_ip_main && $set_ip_main && $set_port && $exit_main"
         done
 
     # Start nodes in workers
@@ -27,7 +27,7 @@ terminate() {
         for n in 1 2
         do
             set_port="export CHORDIFYSERVER_PORT=500$((n - 1))"
-            ssh user@node$i "$find_ip && $set_ip && $set_port && $exit"
+            ssh ubuntu@node$i "$find_ip && $set_ip && $set_port && $exit"
         done
     done
         
