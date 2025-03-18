@@ -30,7 +30,7 @@ nodes = [
 def execute_queries_from_file(filename, node):
     """Reads a file and executes each query, measuring execution time and throughput."""
     try:
-        with open("expirements/queries/" + filename, 'r') as file:
+        with open("~/Chordify/queries/" + filename, 'r') as file:
             queries = [line.strip() for line in file if line.strip()]  # Read all non-empty queries
 
         total_queries = len(queries)
