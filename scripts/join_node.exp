@@ -1,11 +1,9 @@
 #!/usr/bin/expect -f
 
-set timeout 10
+set timeout 10 
 
 set host [lindex $argv 0]
 set mode [lindex $argv 1]
-# For non-bootstrap nodes, bootstrap_port is not needed
-set bootstrap_port [lindex $argv 2]
 
 set bootstrap_ip "10.0.39.177"
 
@@ -14,6 +12,7 @@ spawn ssh $host "cd Chordify/src; python chordify.py"
 expect {
     -re {Server is up and running in \S+:(\d+) !} {
         set port $expect_out(1,string)
+        puts "Captured port: $port"
     }
     timeout {
         puts "Timed out waiting for server port"
@@ -27,7 +26,6 @@ if {$mode == "bootstrap"} {
     puts "BOOTSTRAP_PORT=$port"
     expect ">"
 } else {
-    # For non-bootstrap nodes, simply run the join command without any extra arguments.
     send "join\r"
     expect ">"
 }

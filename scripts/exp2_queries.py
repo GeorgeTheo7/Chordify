@@ -4,6 +4,7 @@ import subprocess
 import multiprocessing
 import time
 import shlex
+import os
 
 # List of query command files (one per process)
 query_files = [
@@ -29,8 +30,9 @@ nodes = [
 
 def execute_queries_from_file(filename, node):
     """Reads a file and executes each query, measuring execution time and throughput."""
+    file_path = os.path.join(os.path.expanduser("~/Chordify/queries"), filename)
     try:
-        with open("~/Chordify/queries/" + filename, 'r') as file:
+        with open(file_path, 'r') as file:
             queries = [line.strip() for line in file if line.strip()]  # Read all non-empty queries
 
         total_queries = len(queries)
