@@ -74,7 +74,7 @@ if __name__ == "__main__":
         results = pool.starmap(execute_commands_from_file, zip(command_files, nodes))
 
     # Print summary results
-    print("\n===== Execution Summary =====")
+    print("\n======== FINAL RESULTS ========")
     for filename, node, time_taken, throughput in results:
-        print(f"[{filename} -> {node}] Time: {time_taken:.2f}s | Throughput: {throughput:.2f} cmds/sec")
+        print(f"[{filename} -- {node}] Time: {time_taken:.2f}s | Throughput: {throughput:.2f} keys/sec")
 
