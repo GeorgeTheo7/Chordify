@@ -1,6 +1,7 @@
 import subprocess
 import multiprocessing
 import time
+import os
 
 # List of command files (one per process)
 command_files = [
@@ -9,7 +10,7 @@ command_files = [
     "insert_02_part.txt",
     "insert_03_part.txt",
     "insert_04_part.txt",
-    "insert_05_part.txt",    
+    "insert_05_part.txt",
     "insert_06_part.txt",
     "insert_07_part.txt",
     "insert_08_part.txt",
@@ -17,21 +18,23 @@ command_files = [
 ]
 
 # Corresponding nodes (one per process)
-localhostNodes = [
-    "127.0.0.1:5000", "127.0.0.1:5001", "127.0.0.1:5002",
-    "127.0.0.1:5005", "127.0.0.1:5004", "127.0.0.1:5003",
-    "127.0.0.1:5006", "127.0.0.1:5007", "127.0.0.1:5008",
-    "127.0.0.1:5009"
+nodes = [
+    "10.0.39.177:5050", "10.0.39.155:5050", "10.0.39.191:5050",
+    "10.0.39.19:5050", "10.0.39.87:5050", "10.0.39.177:5051",
+    "10.0.39.155:5051",  "10.0.39.191:5051",  "10.0.39.19:5051",
+    "10.0.39.87:5051"
 ]
-nodes = ["10.0.39.177:5000", "10.0.39.177:5001", "10.0.39.155:5000", "10.0.39.155:5001", "10.0.39.191:5000", "10.0.39.191:5001", "10.0.39.19:5000", "10.0.39.19:5001" ,"10.0.39.87:5000", "10.0.39.87:5001"]
-    
 
+# Base directory for command files
+base_dir = os.path.expanduser("~/Chordify/insert")
 
 def execute_commands_from_file(filename, node):
     """Reads a file and executes each command, measuring execution time and throughput."""
+    file_path = os.path.join(base_dir, filename)
     try:
-        with open("inserts/" + filename, 'r') as file:
-            commands = [line for line in file if line.strip()]  # Read all non-empty commands
+        with open(file_path, 'r') as file:
+            # Read all non-empty lines
+            commands = [line.strip() for line in file if line.strip()]
 
         total_commands = len(commands)
         if total_commands == 0:
@@ -41,7 +44,8 @@ def execute_commands_from_file(filename, node):
         start_time = time.time()  # Start timing
 
         for command in commands:
-            full_command = f" python cli.py insert \"{command}\" value {node}"
+            # Build the full command string.
+            full_command = f'python ~/Chordify/src/cli.py insert "{command}" "{node}"'
             process = subprocess.run(full_command, shell=True, capture_output=True, text=True)
             print(full_command)
             if process.stdout:
@@ -58,13 +62,14 @@ def execute_commands_from_file(filename, node):
         return filename, node, elapsed_time, throughput  # Return results
 
     except FileNotFoundError:
-        print(f"[{filename}] Error: File not found.")
+        print(f"[{filename}] Error: File not found at {file_path}.")
         return filename, node, 0, 0  # Return zero throughput in case of file errors
     except Exception as e:
         print(f"[{filename}] Unexpected error: {e}")
         return filename, node, 0, 0  # Return zero throughput in case of other errors
 
 if __name__ == "__main__":
+    # Create a pool of 10 processes and run the commands concurrently.
     with multiprocessing.Pool(processes=10) as pool:
         results = pool.starmap(execute_commands_from_file, zip(command_files, nodes))
 
@@ -72,3 +77,4 @@ if __name__ == "__main__":
     print("\n===== Execution Summary =====")
     for filename, node, time_taken, throughput in results:
         print(f"[{filename} -> {node}] Time: {time_taken:.2f}s | Throughput: {throughput:.2f} cmds/sec")
+

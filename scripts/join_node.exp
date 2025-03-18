@@ -1,10 +1,11 @@
 #!/usr/bin/expect -f
 
-set timeout 15
+set timeout 10
 
 set host [lindex $argv 0]
 set mode [lindex $argv 1]
-set bootstrap_port [lindex $argv 2]  ;# Optional, for non-bootstrap nodes
+# For non-bootstrap nodes, bootstrap_port is not needed
+set bootstrap_port [lindex $argv 2]
 
 set bootstrap_ip "10.0.39.177"
 
@@ -26,14 +27,11 @@ if {$mode == "bootstrap"} {
     puts "BOOTSTRAP_PORT=$port"
     expect ">"
 } else {
-    if {$bootstrap_port == ""} {
-        puts "Bootstrap port not provided for join mode"
-        exit 1
-    }
-    send "join -b $bootstrap_ip $bootstrap_port\r"
+    # For non-bootstrap nodes, simply run the join command without any extra arguments.
+    send "join\r"
     expect ">"
 }
 
-# Comment out or remove the exit command to avoid shutdown error
-# send "exit\r"
-# expect eof
+# Use interact to keep the session open so the terminal doesn't immediately close.
+interact
+
